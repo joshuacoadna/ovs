@@ -1,0 +1,87 @@
+#ifndef _RSRC_MGR_CMD_SERVER_H_
+#define _RSRC_MGR_CMD_SERVER_H_
+
+#include "ovsTcpServer.h"
+#include "ovsLists.h"
+
+typedef struct rsrcMgrCmdResponse_t
+{
+    int seq;
+    ovsPktHdr hdr;
+    int fd;
+    int vtyfd;
+    int nodetype;
+    int cmdtype;
+    bool operator==(rsrcMgrCmdResponse_t& d){ return (seq == d.seq);}
+    bool operator!=(rsrcMgrCmdResponse_t& d){ return (!(*this == d));}
+    rsrcMgrCmdResponse_t& operator=(const rsrcMgrCmdResponse_t& p)
+    {
+	seq = p.seq;
+      hdr = p.hdr;
+      fd = p.fd;
+	vtyfd = p.vtyfd;
+       nodetype = p.nodetype;
+	cmdtype = p.cmdtype;
+	
+    	return(*this);
+    }
+}rsrcMgrCmdResponse_t;
+typedef ovsValueList<rsrcMgrCmdResponse_t> rsrcMgrCmdResponseList;
+
+class rsrcMgrCmdServerThreadCb;
+class rsrcMgrCmdServer : public ovsTcpServer
+{
+public:
+	
+    rsrcMgrCmdServer(uint32 port);
+    ~rsrcMgrCmdServer();
+
+    static rsrcMgrCmdServer* instance();
+	
+    /* 
+      * virtual funovsions derived from ovsTcpServer.
+      */
+    int serverReadCb(int arg);
+    void clientReadCb(int arg, int fd);
+    void closeClient(int fd);
+    void cmdResponse(int seq, const char* str);
+
+    rsrcMgrCmdServerThreadCb *_rsrcMgrCmdServerThreadCb;
+
+private:
+	
+    void readCmdInfo(ovsINetworkBuffer& ibuffer, int& vtyfd, int& nodetype, int& cmdtype);
+    void writeCmdInfo(ovsONetworkBuffer& obuffer, int vtyfd, int nodetype, int cmdtype);
+    void WriteResponse(ovsPktHdr& hdr, int ret, int vtyfd, int nodetype, int cmdtype, int fd);
+
+    //int processSetProbeInterval(ovsPktHdr& hdr, ovsINetworkBuffer& ibuffer, int fd);
+    int getCmdSeq(void);
+ 
+
+    rsrcMgrCmdResponseList _cmdRespList;
+    int _seq;
+};
+
+class rsrcMgrCmdServerThreadCb : public ovsThreadCb
+{
+
+public:
+  ~rsrcMgrCmdServerThreadCb() {}	
+  rsrcMgrCmdServerThreadCb(rsrcMgrCmdServer* svr) :
+  	_svr(svr) {}
+	
+  /* 
+    * virtual funovsions derived from ovsThreadCb.
+    */
+  void readCb(int arg, int fd)  { _svr->clientReadCb(arg, fd); }
+
+private:
+  rsrcMgrCmdServer* _svr;	
+
+};
+
+#endif /* _RSRC_MGR_CMD_SERVER_H_ */
+
+
+
+
